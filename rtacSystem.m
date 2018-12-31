@@ -1,104 +1,149 @@
 clear all;
+
 %nilai paramter 
+
 clear all;
- M=1.3608;
- m=0.096;
- R=0.0592;
- I=2.175*10^-4;
- k=186.3;
- N=0;
- F=30;
+
+M = 1.3608;
+
+m = 0.096;
+
+R = 0.0592;
+
+I = 2.175*10^-4;
+
+k = 186.3;
  
- %pembagi di persamaan
- h=I*(M+m)+M*m*R^2;
+
+
+%pembagi di persamaan
+
+h = (M+m)*(I+0.5*m*R^2);
  
- %nilai di matriks A
- a21=-1*k*(I+m*R^2)/h;
- a23=(((m*R*N*h)-(2*m^3*R^3*N))-(2*F*h*(I+m*R^2)*(m^2*R^2)))/(h^2);
- a41=m*R*k/h;
- a43=(-m*R*(-F+2*m*R*(M+m)*N))/(h^2);
+
+
+%nilai di matriks A
+
+a11 = 0;
+a12 = 1;
+a13 = 0;
+a14 = 0;
+a21 = (-k*(I+m*R^2))/h;
+a22 = 0;
+a23 = -(((m^2)*(R^3)*(0.555*((M+m)*I+(M*m*R^2))+m*(0.616*I+0.555*m*R^2)))/(h^2));
+
+a24 = (1.57*I*m*R+1.11*(m^2)*(R^3))/h;
+
+a31 = 0;
+a32 = 0;
+a33 = 0;
+a34 = 1;
+a41 = (0.707*m*R*k)/h;
+
+a42 = 0;
+a43 = 0;
+a44 = -((0.785*(m^2)*(R^2))/h);
  
- %nilai di matriks B
- b21=(I+m*R^2)/h;
- b22=(-m*R/h);
- b41=(-m*R/h);
- b42=(M+m)/h;
+%nilai di matriks B
+b11 = 0;
+b12 = 0;
+b21 = (I+m*R^2)/h;
+b22 = (-0.707*m*R/h);
+b31 = 0;
+b32 = 0;
+b41 = (-0.707*m*R/h);
+b42 = (M+m)/h;
  
- %matriks A,B,C, dan D
- A=[0 1 0 0;a21 0 a23 0; 0 0 0 1;a41 0 a43 0];
- B=[0 0;b21 b22;0 0;b41 b42];
- C=[1 0 0 0;0 1 0 0;0 0 1 0;0 0 0 1];
- D=zeros(4,2);
+%matriks A,B,C, dan D
+A = [a11 a12 a13 a14; a21 a22 a23 a24; a31 a32 a33 a34; a41 a42 a43 a44];
+B = [0 0; b21 b22; 0 0; b41 b42];
+C = eye(4);
+D = zeros(4,2);
  
- [n,m]=size(A);
- %================================================================
- %observable
- Ob=obsv(A,C);
- unob = n-rank(Ob);
- if(unob==0)
-    disp('Given System is Observable.');
- else
-    disp('Given System is Unobservable');
- end
+%================================================================
+%observable
+Ob=obsv(A,C);
+[n,m]=size(Ob);
+unob = m-rank(Ob);
+if(unob==0)
+   disp('Given System is Observable.');
+else
+   disp('Given System is Unobservable');
+end
  
- %controllable
- Co = ctrb(A,B);
- unco=m-rank(Co);
- if(unco==0)
-    disp('Given System is Controllable.');
- else
-    disp('Given System is Uncontrollable');
- end
+%controllable
+Co = ctrb(A,B);
+[n,m]=size(Co);
+unco=n-rank(Co);
+if(unco==0)
+   disp('Given System is Controllable.');
+else
+   disp('Given System is Uncontrollable');
+end
+
+%================================================
  
- %================================================
- %Mengecek kestabilan (melihat apakah pole berada di half-right plane)
- plant=ss(A,B,C,D);
- pole = eig(A);
+%Mengecek kestabilan (melihat apakah pole berada di half-right plane)
  
- %Membuat stabil dengan menggunakan LQR
- Q=C'*C;
- R=0.01*eye(2);
- p=care(A,B,Q,R);
- K=inv(R)*B'*p;
+plant=ss(A,B,C,D);
  
- Anew=A-B*K;
- Bnew=B;
- Cnew=C;
- Dnew=D;
- polenew=eig(Anew);
+pole = eig(A);
  
- %==============================================
- %Membuat frequency response
+ 
+
+%Membuat stabil dengan menggunakan LQR
+ 
+Q=C'*C;
+ 
+R=0.01*eye(2);
+ 
+p=care(A,B,Q,R);
+ 
+K=inv(R)*B'*p;
+ 
+ 
+Anew=A-B*K;
+ 
+Bnew=B;
+ 
+Cnew=C;
+ 
+Dnew=D;
+ 
+polenew=eig(Anew);
+
+plant=ss(Anew,Bnew,Cnew,Dnew);
+%==============================================
+%Membuat frequency response
 tfunction=tf(plant);
 bode(tfunction);
- %================================================
- %Diperoleh sistem baru yang lebih stabil
- %Perhitungan H2 norm, Hinfinity norm, L2 dan L infinity
+%================================================
+%Diperoleh sistem baru yang lebih stabil
+%Perhitungan H2 norm, Hinfinity norm, L2 dan L infinity
  
- %computing H2
- plant=ss(Anew,Bnew,Cnew,Dnew);
- H2=norm(plant,2);
- H2=H2^2;
+%computing H2
+H2=norm(plant,2);
+H2=H2^2;
  
- Pgram=gram(Anew,Bnew);
- Qgram=gram(Anew',Cnew');
+Pgram=gram(Anew,Bnew);
+Qgram=gram(Anew',Cnew');
  
- %hitung h infinity
- G=pck(Anew,Bnew,Cnew,Dnew);
- hinfnorm(G,0.0001)
- linfnorm(G,0.0001)
- w=logspace(-25,25,200);
- Gf=frsp(G,w);
- [u,s,v]=vsvd(Gf);
- vplot('liv,lm',s), grid
+%hitung h infinity
+G=pck(Anew,Bnew,Cnew,Dnew);
+hinfnorm(G,0.0001)
+linfnorm(G,0.0001)
+w=logspace(-25,25,200);
+Gf=frsp(G,w);
+[u,s,v]=vsvd(Gf);
+vplot('liv,lm',s), grid
  
  
- sysgabungan=[A B;C D];
+sysgabungan=[A B;C D];
  
- %computing H inf norm
- ninf = hinfnorm(G) %Checking H? System
+%computing H inf norm
+ninf = hinfnorm(G) %Checking H? System
  
- %computing L inf norm
+%computing L inf norm
 n = norm(G,Inf) %Checking L? System
  
 %computing L2 norm
