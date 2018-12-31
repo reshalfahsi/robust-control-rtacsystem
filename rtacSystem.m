@@ -59,8 +59,8 @@ A = [a11 a12 a13 a14; a21 a22 a23 a24; a31 a32 a33 a34; a41 a42 a43 a44];
 B = [0 0; b21 b22; 0 0; b41 b42];
 C = eye(4);
 D = zeros(4,2);
- 
 %================================================================
+
 %observable
 Ob=obsv(A,C);
 [n,m]=size(Ob);
@@ -80,10 +80,10 @@ if(unco==0)
 else
    disp('Given System is Uncontrollable');
 end
-
 %================================================
  
-%Mengecek kestabilan (melihat apakah pole berada di half-right plane)
+
+%Mengecek kestabilan (melihat apakah pole berada di half-left plane)
  
 plant=ss(A,B,C,D);
  
@@ -111,8 +111,10 @@ Cnew=C;
 Dnew=D;
  
 polenew=eig(Anew);
-
 plant=ss(Anew,Bnew,Cnew,Dnew);
+
+
+
 %==============================================
 %Membuat frequency response
 tfunction=tf(plant);
