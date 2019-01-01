@@ -70,7 +70,7 @@ end
 %================================================
 %Mengecek kestabilan (melihat apakah pole berada di half-right plane)
 plantlama=ss(A,B,C,D);
-openloop=tf(plantlama);
+openloop=tf(plantlama)
 pole = eig(A);
  
 %Gs Gu decomposition sblm LQR
@@ -89,101 +89,110 @@ Cnew=C;
 Dnew=D;
 polenew=eig(Anew);
  
-%==============================================
-%Membuat frequency response
-tfunction=tf(plantlama);
-bode(tfunction);
 %================================================
 %Diperoleh sistem baru yang lebih stabil
 %Perhitungan H2 norm, Hinfinity norm, L2 dan L infinity
  
-%computing H2
+G=pck(Anew,Bnew,Cnew,Dnew);
 plantbaru=ss(Anew,Bnew,Cnew,Dnew);
 closedloop=tf(plantbaru);
-H2=norm(plantbaru,2);
-H2=H2^2;
- 
-Pgram=gram(Anew,Bnew);
-Qgram=gram(Anew',Cnew');
- 
-%hitung h infinity
-G=pck(Anew,Bnew,Cnew,Dnew);
-hinfnorm(G,0.0001)
-linfnorm(G,0.0001)
-w=logspace(-25,25,200);
-Gf=frsp(G,w);
-[u,s,v]=vsvd(Gf);
-vplot('liv,lm',s), grid
- 
-sysgabungan=[Anew Bnew;Cnew Dnew];
- 
-%computing H inf norm
-ninf = hinfnorm(G); %Checking H? System
- 
-%computing L inf norm
-n = norm(G,Inf); %Checking L? System
- 
-%computing L2 norm
-l2 = sqrt(sum(abs(sysgabungan).^2)); %Checking L2 System
-l2 = max(svd(sysgabungan)); %Checking L2 System
-matL2 = norm(sysgabungan,2); %Checking L2 System
- 
- 
+
 %Gs Gu decomposition stlh LQR
 [Gs,Gu]=sdecomp(G)
-h2norm(Gs);
-%tidak perlu h2norm(cjt(Gu)) dikarenakan Gu yang bersifat semi-stabil tidak
-%terdapat pada sistem G tersebut. Ini terjadi karena semua eigenvalue
-%berada di samping kiri plane.
-%Oleh karena itu, h2norm(Gs)
+
+%Observability Gramian Matrix
+Qgram=gram(cjt(Anew),cjt(Cnew));
+
+%computing H2 and L2
+H2=norm(plantbaru,2)
+% atau
+H2=h2norm(G) 
+L2=sqrt(trace(cjt(Bnew)*Qgram*Bnew))
  
-%FIND CONTROLLER K and Khat to find the well-posedness
-for i=1:1:4
-    for j=1:1:2
-        controller(i,j)=closedloop(i,j)/openloop(i,j);
-        hasil(i,j)=1+controller(i,j)*openloop(i,j);
-    end
+%hitung h infinity dan l infinity
+Hinf = hinfnorm(G,0.0001)
+Linf = linfnorm(G,0.0001)
+ 
+%% Internal Stability
+syms s real% Symbolic variable 's'
+
+% Open Loop System
+P = minreal(openloop) %Reduce to minimum order
+
+for i=1:1:4 % Convert transfer function to symbolic
+ for j=1:1:2
+     symP(i,j) = tf2sym(P,i,j);
+     symG_cl(i,j) = tf2sym(closedloop,i,j);
+ end
 end
-controller
- 
-hasil
-%karena variabel 'hasil' tidak sama dengan nol, maka variabel 'hasil' bisa
-%diinvers. Oleh karena itu, sistem ini well-posedness.
- 
-%Find internal stability
-for i=1:1:4
-    for j=1:1:2
-        inversA(i,j)=hasil(i,j)^-1;
-        inversB(i,j)=-controller(i,j)*inversA(i,j);
-        inversC(i,j)=openloop(i,j)*inversA(i,j);
-    end
+
+%% Dari persamaan mencari controller K jika diketahui system closed loop G_cl dan plant P
+%% K = [(G(s)^-1)P(s) - I] P(s)^-1
+symK = simplify((pinv(symG_cl)*symP*pinv(symP)- pinv(symP)));
+symK_hat = -symK;
+for i=1:1:2 % Convert symbolic back to transfer function
+ for j=1:1:4
+ K_hat(i,j) = syms2tf(symK_hat(i,j));
+ end
 end
-inversD=inversA;
+K_hat
+
+%% RHP poles test
+symPK_hat = symP*symK_hat; % P(s)K_hat(s)
+for i=1:1:4 % Convert symbolic back to transfer function
+ for j=1:1:4
+  PK_hat(i,j) = syms2tf(symPK_hat(i,j));
+ end
+end
+
+%% (I-P*K_hat)^-1
+symIStfmatrix = simplify(inv(eye(size(symP*symK_hat)))-symP*symK_hat)
+for i=1:1:4 % Convert symbolic back to transfer function
+ for j=1:1:4
+ IStfmatrix(i,j) = syms2tf(symIStfmatrix(i,j));
+ end
+end
+
+if(isstable(IStfmatrix)==0)
+ disp('Not Internally Stable')
+else
+ disp('Internally Stable')
+end
  
-cekeigA1=eig(inversA(1,1));
-cekeigA2=eig(inversA(2,1));
-cekeigA3=eig(inversA(3,1));
-cekeigA4=eig(inversA(4,1));
-cekeigA5=eig(inversA(1,2));
-cekeigA6=eig(inversA(2,2));
-cekeigA7=eig(inversA(3,2));
-cekeigA8=eig(inversA(4,2));
-%eigenvalue inversA dan inversD selalu sama
+%% Coprime Factorization
+syms s real
+F = -lqr(A, B, Q, R); %gain F sehingga A+BF stabil
+%% M(s)
+AM = A+B*F;
+BM = B;
+CM = F'*F;
+DM = eye(size(D));
+ssM = ss(AM,BM,CM,DM); % state space of system M
+tfM = tf(ssM) % transfer function of system M
  
-cekeigB1=eig(inversB(1,1));
-cekeigB2=eig(inversB(2,1));
-cekeigB3=eig(inversB(3,1));
-cekeigB4=eig(inversB(4,1));
-cekeigB5=eig(inversB(1,2));
-cekeigB6=eig(inversB(2,2));
-cekeigB7=eig(inversB(3,2));
-cekeigB8=eig(inversB(4,2));
+%% N(s)
+AN = A+B*F;
+BN = B;
+CN = C+D*F;
+DN = D;
+ssN = ss(AN,BN,CN,DN); % state space of system N
+tfN = tf(ssN) % transfer function of system N
  
-cekeigC1=eig(inversC(1,1));
-cekeigC2=eig(inversC(2,1));
-cekeigC3=eig(inversC(3,1));
-cekeigC4=eig(inversC(4,1));
-cekeigC5=eig(inversC(1,2));
-cekeigC6=eig(inversC(2,2));
-cekeigC7=eig(inversC(3,2));
-cekeigC8=eig(inversC(4,2));
+%Convert to Symbolic
+for i=1:1:4
+ for j=1:1:2
+     symN(i,j) = tf2sym(tfN,i,j);
+     symM(i,j) = tf2sym(tfM,i,j);
+ end
+end
+
+% diuji apakah P=N*M^-1
+symPcop = symN*pinv(symM)
+
+%Convert symbolic back to transfer function
+for i=1:1:4
+ for j=1:1:4
+ Pcop(i,j) = syms2tf(symPcop(i,j));
+ end
+end
+Pcop
